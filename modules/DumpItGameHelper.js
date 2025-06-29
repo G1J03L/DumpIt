@@ -730,13 +730,32 @@ module.exports = class DumpIt {
 
         // If the 'portfolio' field is not empty, loop through and get the current price of each symbol.
         if (user.portfolio && Object.keys(user.portfolio).length !== 0) {
+            
+            let avgPriceTotal = 0;
+            let gainsTotal = 0;
+            
             for (const symbol of Object.keys(user.portfolio)) {
+                
                 const result = await this.getStockPrice(symbol)
-                user.portfolio[symbol].currentPrice = result.success ? result.price : 0;
+                
+                if (!result.success) {
+                    
+                    logger.error(`Error retrieving stock price for ${symbol}: ${result.message}`);
+                    user.portfolio[symbol].currentPrice = 0; // Set current price to 0 if error
+                } else {
+                    
+                    // Calculate average price and gains for each stock in the portfolio.
+                    const stock = user.portfolio[symbol];
+                    const currentPrice = result.price;
+                    user.portfolio[symbol].currentPrice = currentPrice;
+                    user.portfolio[symbol].gains = this.roundUpCents((currentPrice - stock.avgPrice) * stock.shares);
+                    avgPriceTotal += stock.avgPrice * stock.shares;
+                    gainsTotal += user.portfolio[symbol].gains;
+                }
             }
+            
+            return { success: true, portfolio: user.portfolio || {} };
         }
-
-        return { success: true, portfolio: user.portfolio || {} };
     }
 
     /**

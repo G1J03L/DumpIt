@@ -60,9 +60,8 @@ module.exports = class DumpItGameWrapper {
         const hasAccount = await this.dumpItHelper.playerExists(userId);
 
         if (!hasAccount && interaction.options.getSubcommand() !== "join") {
-            subcommand = "join"; // Force user to create an account first
-            await interaction.followUp(">> No account found; creating your account...");
-            
+            await interaction.followUp(">> No account found. Run the command: **/dumpit join** and provide a username to begin trading!");
+            return;
         } else {
             subcommand = interaction.options.getSubcommand();
         }
@@ -186,6 +185,22 @@ module.exports = class DumpItGameWrapper {
             let fields = [];
             const spacer = {name: "\u200B", value: "\u200B", inline: false};
 
+            // Add a spacer at the beginning
+            fields.push(spacer);
+            // Add a field for the total balance and gains
+            const totalBalance = Object.values(portfolio).reduce((acc, item) => acc + (item.currentPrice * item.shares), 0);
+            const totalGains = Object.values(portfolio).reduce((acc, item) => acc + ((item.currentPrice - item.avgPrice) * item.shares), 0);
+            const summaryField = {
+                name: "**Portfolio Summary**",
+                value: 
+                `**Total Value** :: ${this.#formatCurrency(totalBalance)}\n` +
+                `**Total Gains** :: ${this.#formatCurrency(totalGains)} (${((totalGains / (totalBalance - totalGains)) * 100).toFixed(2)}%)`,
+                inline: false
+            };
+            fields.push(summaryField);
+            // Add a spacer before the portfolio details
+            fields.push(spacer);
+
             const MAX_COLUMNS = 3;
             let col = 0;
             for (const symbol of Object.keys(portfolio)) {
@@ -211,6 +226,8 @@ module.exports = class DumpItGameWrapper {
                 field = {};
                 col += 1;
             }
+            fields.push(spacer);
+            
             return fields;
 
         } else {
