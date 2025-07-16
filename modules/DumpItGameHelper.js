@@ -52,10 +52,16 @@ module.exports = class DumpIt {
         await this.#updateHeartbeatDate();
 
         this._heartbeatInterval = setInterval(async () => {
-            logger.log(`[HEARTBEAT] :: Heartbeat running at ${new Date().toISOString()}`);
+            
+            logger.log(`[HEARTBEAT] :: DumpIt running at ${new Date().toISOString()}`);
+            
             const eom = await this.#isEndOfTheMonth();
+            const fom = await this.#isFirstDayOfTheMonth();
+            
             if (eom === true) {
                 await this.#EOMTasks(); // EOM tasks
+            } else if (fom === true) {
+                await this.#FOMTasks(); // FOM tasks
             }
             await this.#checkForYearChange();
             await this.#updateHeartbeatDate();
@@ -189,6 +195,7 @@ module.exports = class DumpIt {
             await this.properties.updateOne({ key: 'year'}, { $set: { value: new Date().getFullYear() }}, options);
             await this.properties.updateOne({ key: 'gameStarted' }, { $set: { value: true } }, options);
             await this.properties.updateOne({ key: 'startedDate' }, { $set: { value: new Date().toISOString() } }, options);
+            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: false } }, options);
             await this.properties.updateOne({ key: 'currentYearFinalized' }, { $set: { value: false } }, options);
             
             logger.log(`[START] :: DumpIt has started successfully for ${ new Date().getFullYear() }!`);
@@ -922,7 +929,7 @@ module.exports = class DumpIt {
     }
 
     //====================================================================================================================================
-    //#region :: MONTHLY GAINS COMPETITION ::
+    //#region :: MONTHLY GAINS ::
 
     /**
      * Calculate the portfolio which has gained the most value over a month-long period and award the user with a $250 bonus.
@@ -1023,7 +1030,7 @@ module.exports = class DumpIt {
             // Award all bestUsers with the same gain
             for (const user of bestUsers) {
                 await this.users.updateOne({ userId: user.userId }, { $inc: { balance: 250 } });
-                logger.log(`[MONTHLY GAINS] :: Awarded $500 bonus to user ${user.userId} with a gain of ${bestGain.toFixed(2)}%`);
+                logger.log(`[MONTHLY GAINS] :: Awarded ${Settings.monthlyAward} bonus to user ${user.userId} with a gain of ${bestGain.toFixed(2)}%`);
             }
 
             return {
@@ -1088,10 +1095,23 @@ module.exports = class DumpIt {
     async #EOMTasks() {
 
         logger.log("[HEARTBEAT] :: Running end of the month tasks...");
+        
+        const monthFinalized = await this.properties.find({ key: 'monthFinalized' });
+        if (monthFinalized && monthFinalized.value) {
+
+            logger.log("[HEARTBEAT] :: Month already finalized, skipping end of month tasks.");
+            return { success: false, message: 'Month already finalized.' };
+        }
+
         const ceremony = await this.calculateAndAwardTopMonthlyGains();
 
         if (ceremony && ceremony.success) {
+            
             logger.log(`[HEARTBEAT] :: End of the month ceremony completed successfully! Winner: ${ceremony.winner.userId} with gains of $${ceremony.winner.gains}`);
+            
+            // Update the monthFinalized property to true.
+            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: true } }, { upsert: true });
+            
             // If the ceremony was successful, transfer the monthly prize pool to the winner.
             const transferResult = await this.transferMonthlyPrizePool(ceremony.winner.userId);
             if (transferResult.success) {
@@ -1099,13 +1119,27 @@ module.exports = class DumpIt {
             } else {
                 logger.error(`[HEARTBEAT] :: Failed to transfer monthly prize pool: ${transferResult.message}`);
             }
+
         } else if (this.runRollOverBonus && !ceremony.success) {
+            
             await this.rollOverBonus();
+            
             logger.log(`[HEARTBEAT] :: Rolled $250 bonus over to the next month.`);
             this.runRollOverBonus = false; // Reset the rollover bonus flag
+            // Update the monthFinalized property to true.
+            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: true } }, { upsert: true });
         } else {
+
             logger.error(`[HEARTBEAT] :: End of the month ceremony failed: ${ceremony.message}`);
+            // Update the monthFinalized property to false.
+            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: false } }, { upsert: true });
         }
+    }
+
+    async #FOMTasks() {
+        // Reset monthFinalized property to false for the next month.
+        logger.log("[HEARTBEAT] :: Running first of the month tasks...");
+        await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: false } }, { upsert: true });
     }
 
     /**
@@ -1136,15 +1170,38 @@ module.exports = class DumpIt {
                 resolve(false);
             }
         });
-
-        
     }
+
+    // Checks to see if today is the first day of the month.
+    async #isFirstDayOfTheMonth() {
+
+        return new Promise( async (resolve, reject) => {
+            if (!this.properties) return false;
+
+            logger.log(`[EOM CHECK] :: Checking if today is the first day of the month...`);
+
+            const currentDate = new Date();
+            const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+            const heartbeat = await this.properties.findOne({ key: 'heartbeatDate' });
+            if (
+                heartbeat 
+                && heartbeat.value 
+                && new Date(heartbeat.value).getTime() === firstDayOfMonth.getTime()
+            ) {
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        })
+    }
+
 
     //#endregion :: MONTHLY GAINS COMPETITION ::
     //====================================================================================================================================
 
     //====================================================================================================================================
-    //#region :: Views ::
+    //#region :: VIEWS ::
 
     // Create all views below in one convenient method.
     /**
@@ -1227,10 +1284,10 @@ module.exports = class DumpIt {
     //====================================================================================================================================
 
     //====================================================================================================================================
-    //#region :: Reports ::
+    //#region :: REPORTS ::
 
     //
 
-    //#endregion :: Reports ::
+    //#endregion :: REPORTS ::
     //====================================================================================================================================
 }
