@@ -140,9 +140,27 @@ module.exports =
                     .setName("annals")
                     .setDescription("View past years' winners and results.")
                     .addIntegerOption(
-                        option => option.setName("year")
+                        option => option
+                            .setName("year")
                             .setDescription("The year of results you wish to see.")
                             .setRequired(true)
+                    )
+        )
+        .addSubcommand // CEREMONY
+        (
+            subcommand =>
+                subcommand
+                    .setName("ceremony")
+                    .setDescription("Execute the [monthly] or [year-end] ceremony to award the winners!")
+                    .addStringOption(
+                        option => option
+                            .setName("type")
+                            .setDescription("Choose the ceremony type.")
+                            .setRequired(true)
+                            .addChoices(
+                                { name: "Monthly", value: "M" },
+                                { name: "Year-End", value: "Y" }
+                            )
                     )
         ),
 	async execute(interaction)

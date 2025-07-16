@@ -135,6 +135,16 @@ module.exports = class DumpItGameWrapper {
                 break;
             }
 
+            case "ceremony": {
+                await interaction.followUp("Please hold while the winner is determined...");
+                const type = interaction.options.getString("type", true);
+                result = type === "M" 
+                    ? await this.dumpItHelper.executeMonthlyAwardsCeremony()
+                    : await this.dumpItHelper.executeYearEndAwardsCeremony(); // Other option is "Y"
+                processed = this.#processCeremonyResults(result);
+                break;
+            }
+
             default:
                 return await interaction.followUp(">> Unknown subcommand.", {ephemeral: true });
         }
@@ -319,7 +329,7 @@ module.exports = class DumpItGameWrapper {
     #processAnnalsResults(result) {
 
         if (result.success) {
-            
+            // TODO SOON TM
         } else {
 
             return { success: false, message: "No transactions found - check your balance\nand start buying and selling TODAY!" }
@@ -329,6 +339,34 @@ module.exports = class DumpItGameWrapper {
             return result;
         } else {
             return;
+        }
+    }
+
+    #processCeremonyResults(result) {
+
+        if (result.success) {
+
+            const winner = result.user;
+
+            let field = {};
+            let fields = [];
+            const spacer = {name: "\u200B", value: "\u200B", inline: false};
+            
+            fields.push(spacer);
+            const heading = `**Your winner!! :: [${winner}]**\n`;
+            const body = `Congratulations! You've been awarded $${result.prize} for having the largest gains (${result.ceremony.winner.gain}%) for the month!`;
+            
+            field.name = heading;
+            field.value = body;
+            field.inline = false;
+
+            fields.push(field);
+            field = {};
+            fields.push(spacer);
+
+            return fields;
+        } else {
+            return { success: false, message: "The monthly ceremony cannot be executed at this time - come back later!" };
         }
     }
     
