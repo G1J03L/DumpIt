@@ -52,17 +52,8 @@ module.exports = class DumpIt {
         await this.#updateHeartbeatDate();
 
         this._heartbeatInterval = setInterval(async () => {
-            
-            logger.log(`[HEARTBEAT] :: DumpIt running at ${new Date().toISOString()}`);
-            
-            const eom = await this.#isEndOfTheMonth();
-            const fom = await this.#isFirstDayOfTheMonth();
-            
-            if (eom === true) {
-                await this.#EOMTasks(); // EOM tasks
-            } else if (fom === true) {
-                await this.#FOMTasks(); // FOM tasks
-            }
+            logger.log(`[HEARTBEAT] :: Heartbeat running at ${new Date().toISOString()}`);
+            await this.#checkForMonthChange();
             await this.#checkForYearChange();
             await this.#updateHeartbeatDate();
         }, 60 * 60 * 1000); // 1 hour in ms
@@ -936,7 +927,23 @@ module.exports = class DumpIt {
      * This method is called at the end of each month to determine the top performer.
      * @return {Promise<Object>} - The userId and gain of the top performer.
      */
-    async calculateAndAwardTopMonthlyGains() {
+
+    async executeMonthlyAwardsCeremony() {
+
+        logger.log(`[MONTHLY GAINS] :: Executing monthly ceremony checks and awards...`);
+
+        const eom = await this.#isEndOfTheMonth();
+        if (eom === true) {
+           return await this.#EOMTasks(); // EOM tasks
+        } else {
+            const today = new Date();
+            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const daysLeft = Math.ceil((endOfMonth - today) / (1000 * 60 * 60 * 24));
+            return { success: false, message: `It is not the end of the month yet - only **${daysLeft}** more sleeps!`};
+        }
+}
+
+    async #calculateAndAwardTopMonthlyGains() {
 
         logger.log(`[MONTHLY GAINS] :: Calculating monthly portfolio gains...`);
 
@@ -1094,45 +1101,75 @@ module.exports = class DumpIt {
      */
     async #EOMTasks() {
 
-        logger.log("[HEARTBEAT] :: Running end of the month tasks...");
-        
-        const monthFinalized = await this.properties.find({ key: 'monthFinalized' });
-        if (monthFinalized && monthFinalized.value) {
-
-            logger.log("[HEARTBEAT] :: Month already finalized, skipping end of month tasks.");
-            return { success: false, message: 'Month already finalized.' };
-        }
-
-        const ceremony = await this.calculateAndAwardTopMonthlyGains();
+        logger.log("[CEREMONY] :: Running end of the month tasks...");
+        const ceremony = await this.#calculateAndAwardTopMonthlyGains();
 
         if (ceremony && ceremony.success) {
             
-            logger.log(`[HEARTBEAT] :: End of the month ceremony completed successfully! Winner: ${ceremony.winner.userId} with gains of $${ceremony.winner.gains}`);
-            
-            // Update the monthFinalized property to true.
-            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: true } }, { upsert: true });
-            
+            logger.log(`[CEREMONY] :: End of the month ceremony completed successfully! Winner: ${ceremony.winner.userId} with gains of $${ceremony.winner.gain}`);
             // If the ceremony was successful, transfer the monthly prize pool to the winner.
             const transferResult = await this.transferMonthlyPrizePool(ceremony.winner.userId);
             if (transferResult.success) {
-                logger.log(`[HEARTBEAT] :: Transferred monthly prize pool of $${transferResult.award} to user ${transferResult.user}.`);
+                logger.log(`[CEREMONY] :: Transferred monthly prize pool of $${transferResult.award} to user ${transferResult.user}.`);
             } else {
-                logger.error(`[HEARTBEAT] :: Failed to transfer monthly prize pool: ${transferResult.message}`);
+                logger.error(`[CEREMONY] :: Failed to transfer monthly prize pool: ${transferResult.message}`);
             }
+
+            return {
+                success: ceremony.success && transferResult.success, 
+                ceremony: ceremony, 
+                prize: transferResult.award, 
+                user: transferResult.user
+            };
 
         } else if (this.runRollOverBonus && !ceremony.success) {
             
             await this.rollOverBonus();
-            
-            logger.log(`[HEARTBEAT] :: Rolled $250 bonus over to the next month.`);
+            logger.log(`[CEREMONY] :: Rolled $250 bonus over to the next month.`);
             this.runRollOverBonus = false; // Reset the rollover bonus flag
-            // Update the monthFinalized property to true.
-            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: true } }, { upsert: true });
-        } else {
+            return { success: false, message: "No winners this month! The prize money has been added to the pool and will be awarded at next month's ceremony!"};
 
-            logger.error(`[HEARTBEAT] :: End of the month ceremony failed: ${ceremony.message}`);
-            // Update the monthFinalized property to false.
-            await this.properties.updateOne({ key: 'monthFinalized' }, { $set: { value: false } }, { upsert: true });
+        } else {
+            
+            logger.error(`[CEREMONY] :: End of the month ceremony failed: ${ceremony.message}`);
+            return { success: false, message: "The ceremony failed for some reason - please alert an adult..." };
+        }
+    }
+
+    /**
+     * Checks current date for the last day of the month, and updates a property
+     */
+    async #checkForMonthChange() {
+
+        const now = new Date();
+        let lastDayProp = await this.properties.findOne({ key: 'lastDayOfCurrentMonth' });
+
+        if (!lastDayProp) {
+            // If not set, calculate last day of current month and upsert
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            await this.properties.updateOne(
+                { key: 'lastDayOfCurrentMonth' },
+                { $set: { value: lastDay.toISOString() } },
+                { upsert: true }
+            );
+            lastDayProp = { value: lastDay.toISOString() };
+        }
+
+        const lastDayDate = new Date(lastDayProp.value);
+        if (now >= lastDayDate) {
+            await this.properties.updateOne(
+                { key: 'endOfMonthFlag' },
+                { $set: { value: true } },
+                { upsert: true }
+            );
+            logger.log(`[MONTH CHECK] :: End of month detected, flag set.`);
+        } else {
+            await this.properties.updateOne(
+                { key: 'endOfMonthFlag' },
+                { $set: { value: false } },
+                { upsert: true }
+            );
+            logger.log(`[MONTH CHECK] :: Not end of month, flag cleared.`);
         }
     }
 
@@ -1157,11 +1194,13 @@ module.exports = class DumpIt {
             const currentDate = new Date();
             const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
+            const isEndOfMonth = await this.properties.findOne({key: "endOfMonthFlag"});
             const heartbeat = await this.properties.findOne({ key: 'heartbeatDate' });
-            if (
-                heartbeat 
+
+            if (isEndOfMonth ||
+                (heartbeat 
                 && heartbeat.value 
-                && new Date(heartbeat.value).getTime() === lastDayOfMonth.getTime()
+                && new Date(heartbeat.value).getTime() === lastDayOfMonth.getTime())
             ) {
                 logger.log(`[EOM CHECK] :: Today is the last day of the month - preparing for end of month tasks!`);
                 resolve(true);
