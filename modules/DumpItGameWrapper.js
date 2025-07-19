@@ -45,6 +45,11 @@ module.exports = class DumpItGameWrapper {
             title: "Leaderboard",
             description: "Leaderboard of current holdings",
             isDM: false
+        },
+        "ceremony": {
+            title: "Award Ceremony",
+            description: "Time to see whose bets have paid off",
+            isDM: false
         }
     }
 
