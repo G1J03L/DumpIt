@@ -1169,14 +1169,14 @@ module.exports = class DumpIt {
                 { $set: { value: true } },
                 { upsert: true }
             );
-            logger.log(`[MONTH CHECK] :: End of month detected, flag set.`);
+            logger.log(`[MONTH CHECK] :: End of month detected, 'endOfMonthFlag' flag set.`);
         } else {
             await this.properties.updateOne(
                 { key: 'endOfMonthFlag' },
                 { $set: { value: false } },
                 { upsert: true }
             );
-            logger.log(`[MONTH CHECK] :: Not end of month, flag cleared.`);
+            logger.log(`[MONTH CHECK] :: Not end of month, 'endOfMonthFlag' flag cleared.`);
         }
     }
 
