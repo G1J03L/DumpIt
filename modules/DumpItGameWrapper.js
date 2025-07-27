@@ -375,7 +375,7 @@ module.exports = class DumpItGameWrapper {
 
             return fields;
         } else {
-            return { success: false, message: "The monthly ceremony cannot be executed at this time - come back later!" };
+            return { success: false, message: result.message };
         }
     }
 
