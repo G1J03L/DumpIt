@@ -4,6 +4,7 @@ const DumpIt = require('./DumpItGameHelper.js');
 
 module.exports = class DumpItGameWrapper {
 
+    // At least a title and description should be set for each subcommand
     #COMMAND_EMBED_OPTS = {
         "join": {
             title: "Join",
@@ -159,6 +160,9 @@ module.exports = class DumpItGameWrapper {
 
         return;
     }
+
+    //====================================================================================================================================
+    //#region :: RESULT PROCESSORS
 
     #processJoinResult(result, username) {
 
@@ -374,7 +378,13 @@ module.exports = class DumpItGameWrapper {
             return { success: false, message: "The monthly ceremony cannot be executed at this time - come back later!" };
         }
     }
+
+    //#endregion
+    //====================================================================================================================================
     
+
+    //====================================================================================================================================
+    //#region :: FORMATTERS
     #formatCurrency(amount) {
 
         return amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -456,3 +466,6 @@ module.exports = class DumpItGameWrapper {
         }
     }
 }
+
+//#endregion
+//====================================================================================================================================

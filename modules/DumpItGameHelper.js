@@ -1026,12 +1026,12 @@ module.exports = class DumpIt {
             this.runRollOverBonus = true; // Set flag to roll over the bonus
             return {
                 success: false,
-                message: '>> It appears that it was a rough month; no gains were made, folks.\nThe $250 bonus will roll over into the next month.'
+                message: 'It appears that it was a rough month; no gains were made, folks.\nThe $250 bonus will roll over into the next month.'
             };
         }
         
         // If multiple users have the same best gain, log them and return a combined userId
-        if (bestUsers.length > 0) {
+        if (bestUsers.length > 1) {
 
             logger.log(`[MONTHLY GAINS] :: Multiple users with the same gain: ${bestUsers.map(u => u.userId).join(', ')}`);
             // Award all bestUsers with the same gain
@@ -1044,7 +1044,7 @@ module.exports = class DumpIt {
                 userId: bestUsers.map(u => u.userId).join(', '), // Join userIds if multiple users have the same gain
                 gain: bestGain
             };
-        } else if (bestUser) {
+        } else if (bestUser.length === 1) {
 
             // If only one user has the best gain, award them
             await this.users.updateOne({ userId: bestUser.userId }, { $inc: { balance: 250 } });
@@ -1053,6 +1053,13 @@ module.exports = class DumpIt {
             return {
                 userId: bestUser.userId,
                 gain: bestGain
+            };
+        } else {
+
+            logger.log(`[MONTHLY GAINS] :: No users have best gains; check the error logs.`);
+            return {
+                success: false,
+                message: "No winner could be determined at this time; please try again later."
             };
         }
     }
@@ -1131,7 +1138,7 @@ module.exports = class DumpIt {
 
         } else {
             
-            logger.error(`[CEREMONY] :: End of the month ceremony failed: ${ceremony.message}`);
+            logger.error(`[CEREMONY] :: End of the month ceremony failed...`);
             return { success: false, message: "The ceremony failed for some reason - please alert an adult..." };
         }
     }
