@@ -1204,7 +1204,7 @@ module.exports = class DumpIt {
             const isEndOfMonth = await this.properties.findOne({key: "endOfMonthFlag"});
             const heartbeat = await this.properties.findOne({ key: 'heartbeatDate' });
 
-            if (isEndOfMonth ||
+            if (isEndOfMonth.value &&
                 (heartbeat 
                 && heartbeat.value 
                 && new Date(heartbeat.value).getTime() === lastDayOfMonth.getTime())
