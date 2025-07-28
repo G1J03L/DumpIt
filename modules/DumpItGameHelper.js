@@ -1006,19 +1006,28 @@ module.exports = class DumpIt {
         for (const userId in userPctGains) {
 
             const pctGain = userPctGains[userId];
-            if (pctGain && pctGain === bestGain) {
+            if (pctGain > 0 && bestGain < 0) {
+                // INITIAL CASE
+                bestGain = pctGain;
+                if (!bestUsers.includes(bestUser)) bestUsers.push(bestUser);
+                logger.log(`[MONTHLY GAINS] :: User ${userId} now has the largest gain (${pctGain.toFixed(2)}%)!`);
 
+            } else if (pctGain > 0 && pctGain === bestGain) {
+                // TIE CASE
                 bestUsers.push({ userId, pctGain }); // Add current user to the list of best users
                 if (!bestUsers.includes(bestUser)) bestUsers.push(bestUser); // Add the previous best user with the same gain
                 logger.log(`[MONTHLY GAINS] :: User ${userId} has tied for the largest gain!`);
 
-            } else if (pctGain && pctGain > bestGain) {
-
+            } else if (pctGain > 0 && pctGain > bestGain) {
+                // NEW-BEST CASE
                 bestGain = pctGain;
                 bestUser = { userId, pctGain };
                 bestUsers = [bestUser]; // Reset best users to only the new best user
                 logger.log(`[MONTHLY GAINS] :: New best user found: ${userId} with a gain of ${bestGain.toFixed(2)}%`);
-            } 
+            } else {
+                // DEFAULT CASE
+                logger.log(`[MONTHLY GAINS] :: Gain does not meet or exceed threshold (${bestGain.toFixed(2) ?? 0}%): ${userId} with a gain of ${pctGain.toFixed(2)}%`);
+            }
         }
 
         if (bestGain === 0) {
