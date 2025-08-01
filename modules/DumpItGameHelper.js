@@ -1164,7 +1164,7 @@ module.exports = class DumpIt {
         const now = new Date();
         let lastDayProp = await this.properties.findOne({ key: 'lastDayOfCurrentMonth' });
 
-        if (!lastDayProp) {
+        if (!lastDayProp?.value) {
             // If not set, calculate last day of current month and upsert
             const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
             await this.properties.updateOne(
