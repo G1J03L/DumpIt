@@ -1173,6 +1173,19 @@ module.exports = class DumpIt {
                 { upsert: true }
             );
             lastDayProp = { value: lastDay.toISOString() };
+
+        }  else {
+            // Recalculate new end of month if the month rolled over
+            const lastDayDate = new Date(lastDayProp.value);
+            if (lastDayDate.getMonth() !== now.getMonth() || lastDayDate.getFullYear() !== now.getFullYear()) {
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                await this.properties.updateOne(
+                    { key: 'lastDayOfCurrentMonth' },
+                    { $set: { value: lastDay.toISOString() } },
+                    { upsert: true }
+                );
+                lastDayProp.value = lastDay.toISOString();
+            }
         }
 
         const lastDayDate = new Date(lastDayProp.value);
@@ -1215,13 +1228,8 @@ module.exports = class DumpIt {
             const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
             const isEndOfMonth = await this.properties.findOne({key: "endOfMonthFlag"});
-            const heartbeat = await this.properties.findOne({ key: 'heartbeatDate' });
 
-            if (isEndOfMonth.value &&
-                (heartbeat 
-                && heartbeat.value 
-                && new Date(heartbeat.value).getTime() === lastDayOfMonth.getTime())
-            ) {
+            if (isEndOfMonth.value && currentDate.getDate() > lastDayOfMonth.getDate()) {
                 logger.log(`[EOM CHECK] :: Today is the last day of the month - preparing for end of month tasks!`);
                 resolve(true);
             } else {
