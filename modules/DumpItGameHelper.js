@@ -939,7 +939,11 @@ module.exports = class DumpIt {
             const today = new Date();
             const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
             const daysLeft = Math.ceil((endOfMonth - today) / (1000 * 60 * 60 * 24));
-            return { success: false, message: `It is not the end of the month yet - only **${daysLeft}** more sleeps!`};
+
+            const resultMessage = daysLeft === 0 
+                ? `The ceremony will be held tomorrow! Tell yo' friends.` 
+                : `It is not the end of the month yet - only **${daysLeft}** more sleeps!`;
+            return { success: false, message: resultMessage };
         }
 }
 
