@@ -1229,7 +1229,7 @@ module.exports = class DumpIt {
 
             const isEndOfMonth = await this.properties.findOne({key: "endOfMonthFlag"});
 
-            if (isEndOfMonth.value && currentDate.getDate() > lastDayOfMonth.getDate()) {
+            if (isEndOfMonth.value && currentDate.getDate() < lastDayOfMonth.getDate()) {
                 logger.log(`[EOM CHECK] :: Today is the last day of the month - preparing for end of month tasks!`);
                 resolve(true);
             } else {
