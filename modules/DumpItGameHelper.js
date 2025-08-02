@@ -530,10 +530,50 @@ module.exports = class DumpIt {
             await fmp.stock(symbol).quote().then(data => {
                 if (data.length > 0) {
                     resolve({ success: true, price: data[0].price });
+                } else if (data.error) {
+                    resolve({ success: false, message: "Stock symbol not tracked by this service ." });
                 } else {
-                    resolve({ success: false, message: "Stock symbol not tracked by this service." });
+                    this.#setAPILimitExceededFlag();
+                    resolve({ success: false, message: "API limit exceeded. Please try again later." });
                 }
             });
+        });
+    }
+
+    /**
+     * Checks if the API limit has been exceeded.
+     * This method checks the properties collection for a flag indicating API limit status.
+     * @return {Promise<boolean>} - Returns true if the API limit has been exceeded, false otherwise.
+     * */
+    async isAPILimitExceeded() {
+        const apiLimitExceeded = await this.properties.findOne({ key: 'apiLimitExceeded' });
+        if (!apiLimitExceeded || apiLimitExceeded?.value !== true) {
+            // Start a timer to reset the API limit exceeded flag after the day rolls over.
+            const resetTime = new Date().getDate() + 1; // Reset at the start of the next day
+            setTimeout(async () => {
+                await this.properties.updateOne({ key: 'apiLimitExceeded' }, { $set: { value: false } }, { upsert: true });
+                logger.log(`[API LIMIT] :: API limit reset at ${new Date().toISOString()}`);
+            }, resetTime - new Date().getDate());
+        }
+        return apiLimitExceeded && apiLimitExceeded.value === true;
+    }
+
+    /**
+     * Sets a flag in the properties collection to indicate that the API limit has been exceeded.
+     * This method is called when the API limit is reached to prevent further API calls.
+     * @return {Promise<void>}
+     * @private
+     * */
+    async #setAPILimitExceededFlag() {
+        // Set a flag in the properties collection to indicate API limit exceeded
+        await this.properties.updateOne(
+            { key: 'apiLimitExceeded' },
+            { $set: { value: true } },
+            { upsert: true }
+        ).then(() => {
+            logger.error(`[API LIMIT] :: API limit exceeded. Please try again later.`);
+        }).catch(error => {
+            logger.error(`[API LIMIT] :: Error setting API limit exceeded flag:`, error);
         });
     }
 

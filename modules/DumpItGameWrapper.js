@@ -72,6 +72,8 @@ module.exports = class DumpItGameWrapper {
             subcommand = interaction.options.getSubcommand();
         }
 
+        const apiLimitCheck = await this.#checkAPILimitExceeded();
+
         let result, processed, imageUrl = null;
         switch (subcommand) {
 
@@ -94,9 +96,14 @@ module.exports = class DumpItGameWrapper {
             }
 
             case "buy": {
+                if (apiLimitCheck && apiLimitCheck.success === false) {
+                    result = apiLimitCheck;
+                    break;
+                }
                 await interaction.followUp("Please hold for buy confirmation...");
                 const buySymbol = interaction.options.getString("symbol", true);
                 const buyShares = interaction.options.getInteger("shares", true);
+                await checkAPILimitExceeded()
                 result = await this.dumpItHelper.buyStock(userId, buySymbol, buyShares);
                 processed = this.#processBuyResult(result);
                 break;
@@ -110,6 +117,10 @@ module.exports = class DumpItGameWrapper {
             }
 
             case "portfolio": {
+                if (apiLimitCheck && apiLimitCheck.success === false) {
+                    result = apiLimitCheck;
+                    break;
+                }
                 await interaction.followUp("Please wait while we fetch your portfolio...");
                 result = await this.dumpItHelper.getUserPortfolio(userId);
                 processed = this.#processPortfolioResults(result);
@@ -127,6 +138,10 @@ module.exports = class DumpItGameWrapper {
             }
 
             case "leaderboard": {
+                if (apiLimitCheck && apiLimitCheck.success === false) {
+                    result = apiLimitCheck;
+                    break;
+                }
                 await interaction.followUp("Please wait while we generate the leaderboard...");
                 result = await this.dumpItHelper.getYearToDateEarnings();
                 processed = this.#processLeaderboardResults(result);
@@ -142,6 +157,10 @@ module.exports = class DumpItGameWrapper {
             }
 
             case "ceremony": {
+                if (apiLimitCheck && apiLimitCheck.success === false) {
+                    result = apiLimitCheck;
+                    break;
+                }
                 await interaction.followUp("Please hold while the winner is determined...");
                 const type = interaction.options.getString("type", true);
                 result = type === "M" 
@@ -163,6 +182,15 @@ module.exports = class DumpItGameWrapper {
 
     //====================================================================================================================================
     //#region :: RESULT PROCESSORS
+
+    async #checkAPILimitExceeded() {
+        const isAPILimitExceeded = await this.dumpItHelper.isAPILimitExceeded();
+        if (isAPILimitExceeded) {
+            return { success: false, message: "API limit exceeded. Please try again later." };
+        } else {
+            return null;
+        }
+    }
 
     #processJoinResult(result, username) {
 
