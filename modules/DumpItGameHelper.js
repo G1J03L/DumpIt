@@ -1004,7 +1004,7 @@ module.exports = class DumpIt {
 
         // Find the user or users with the highest percentage gain.
         let bestGain = -Infinity;
-        let bestUser = null;
+        // let bestUser = null;
         let bestUsers = [];
 
         for (const userId in userPctGains) {
@@ -1013,19 +1013,18 @@ module.exports = class DumpIt {
             if (pctGain > 0 && bestGain < 0) {
                 // INITIAL CASE
                 bestGain = pctGain;
-                if (!bestUsers.includes(bestUser)) bestUsers.push(bestUser);
+                bestUsers.push({ userId, pctGain });
                 logger.log(`[MONTHLY GAINS] :: User ${userId} now has the largest gain (${pctGain.toFixed(2)}%)!`);
 
             } else if (pctGain > 0 && pctGain === bestGain) {
                 // TIE CASE
                 bestUsers.push({ userId, pctGain }); // Add current user to the list of best users
-                if (!bestUsers.includes(bestUser)) bestUsers.push(bestUser); // Add the previous best user with the same gain
                 logger.log(`[MONTHLY GAINS] :: User ${userId} has tied for the largest gain!`);
 
             } else if (pctGain > 0 && pctGain > bestGain) {
                 // NEW-BEST CASE
                 bestGain = pctGain;
-                bestUser = { userId, pctGain };
+                const bestUser = { userId, pctGain };
                 bestUsers = [bestUser]; // Reset best users to only the new best user
                 logger.log(`[MONTHLY GAINS] :: New best user found: ${userId} with a gain of ${bestGain.toFixed(2)}%`);
             } else {
@@ -1039,7 +1038,7 @@ module.exports = class DumpIt {
             this.runRollOverBonus = true; // Set flag to roll over the bonus
             return {
                 success: false,
-                message: 'It appears that it was a rough month; no gains were made, folks.\nThe $250 bonus will roll over into the next month.'
+                message: `It appears that it was a rough month; no gains were made, folks.\nThe $${Settings.monthlyAward} bonus will roll over into the next month.`
             };
         }
         
@@ -1049,22 +1048,24 @@ module.exports = class DumpIt {
             logger.log(`[MONTHLY GAINS] :: Multiple users with the same gain: ${bestUsers.map(u => u.userId).join(', ')}`);
             // Award all bestUsers with the same gain
             for (const user of bestUsers) {
-                await this.users.updateOne({ userId: user.userId }, { $inc: { balance: 250 } });
-                logger.log(`[MONTHLY GAINS] :: Awarded ${Settings.monthlyAward} bonus to user ${user.userId} with a gain of ${bestGain.toFixed(2)}%`);
+                await this.users.updateOne({ userId: user.userId }, { $inc: { balance: Settings.monthlyAward } });
+                logger.log(`[MONTHLY GAINS] :: Awarded $${Settings.monthlyAward} bonus to user ${user.userId} with a gain of ${bestGain.toFixed(2)}%`);
             }
 
             return {
+                success: true,
                 userId: bestUsers.map(u => u.userId).join(', '), // Join userIds if multiple users have the same gain
                 gain: bestGain
             };
-        } else if (bestUser.length === 1) {
+        } else if (bestUsers.length === 1) {
 
             // If only one user has the best gain, award them
-            await this.users.updateOne({ userId: bestUser.userId }, { $inc: { balance: 250 } });
-            logger.log(`[MONTHLY GAINS] :: Awarded $500 bonus to user ${bestUser.userId} with a gain of ${bestGain.toFixed(2)}%`);
+            await this.users.updateOne({ userId: bestUsers[0].userId }, { $inc: { balance: Settings.monthlyAward } });
+            logger.log(`[MONTHLY GAINS] :: Awarded $${Settings.monthlyAward} bonus to user ${bestUsers[0].userId} with a gain of ${bestGain.toFixed(2)}%`);
 
             return {
-                userId: bestUser.userId,
+                success: true,
+                userId: bestUsers.userId,
                 gain: bestGain
             };
         } else {
