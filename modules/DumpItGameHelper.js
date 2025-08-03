@@ -270,9 +270,10 @@ module.exports = class DumpIt {
     async getYearToDateEarnings() {
 
         // Fetch all users from the database
-        const players = await this.users.find({}).toArray();
+        const users = await this.users.find({}).toArray();
+        
         const ytdEarnings = await Promise.all(
-            players.map(async (user) => {
+            users.map(async (user) => {
                 let totalValue = user.balance;
                 let gains = 0;
                 if (user.portfolio) {
@@ -963,7 +964,7 @@ module.exports = class DumpIt {
     //#region :: MONTHLY GAINS ::
 
     /**
-     * Calculate the portfolio which has gained the most value over a month-long period and award the user with a $250 bonus.
+     * Calculate the portfolio which has gained the most value over a month-long period and award the user with a $X bonus.
      * This method is called at the end of each month to determine the top performer.
      * @return {Promise<Object>} - The userId and gain of the top performer.
      */
@@ -1118,7 +1119,7 @@ module.exports = class DumpIt {
         }
     }
 
-    // Roll over the $250 bonus to the next month by increasing the property 
+    // Roll over the $X bonus to the next month by increasing the property 
     // "monthlyBonusPool" in the "properties" collection.
     async rollOverBonus() {
 
@@ -1128,7 +1129,7 @@ module.exports = class DumpIt {
             { upsert: true }
         );
 
-        logger.log(`[MONTHLY GAINS] :: Rolled over the $250 bonus prize to the next month.`);
+        logger.log(`[MONTHLY GAINS] :: Rolled over the ${Settings.monthlyAward} bonus prize to the next month.`);
     }
 
     async transferMonthlyPrizePool(userId) {
@@ -1186,7 +1187,7 @@ module.exports = class DumpIt {
         } else if (this.runRollOverBonus && !ceremony.success) {
             
             await this.rollOverBonus();
-            logger.log(`[CEREMONY] :: Rolled $250 bonus over to the next month.`);
+            logger.log(`[CEREMONY] :: Rolled ${Settings.monthlyAward} bonus over to the next month.`);
             this.runRollOverBonus = false; // Reset the rollover bonus flag
             return { success: false, message: "No winners this month! The prize money has been added to the pool and will be awarded at next month's ceremony!"};
 
