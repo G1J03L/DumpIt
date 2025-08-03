@@ -184,7 +184,9 @@ module.exports = class DumpItGameWrapper {
     //#region :: RESULT PROCESSORS
 
     async #checkAPILimitExceeded() {
+        
         const isAPILimitExceeded = await this.dumpItHelper.isAPILimitExceeded();
+
         if (isAPILimitExceeded) {
             return { success: false, message: "API limit exceeded. Please try again later." };
         } else {
@@ -193,7 +195,6 @@ module.exports = class DumpItGameWrapper {
     }
 
     #processJoinResult(result, username) {
-
         return `[ ${username} ] :: ${result.message}`;
     }
 
@@ -218,7 +219,6 @@ module.exports = class DumpItGameWrapper {
     }
 
     #processBalanceResult(result) {
-        
         return `Account Balance :: ${this.#formatCurrency(result)}`;
     }
 
