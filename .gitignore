@@ -2,3 +2,5 @@ node_modules/*
 logs/*
 app-config.json*
 *.ini
+*.bak
+.vscode/tasks.json
